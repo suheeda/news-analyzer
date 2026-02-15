@@ -6,51 +6,93 @@ from etl_store import get_articles
 st.set_page_config(page_title="News Analyzer", layout="wide")
 st.title("📰 News Analyzer Dashboard")
 
+# -----------------------------------
+# Fetch articles from DB
+# -----------------------------------
 articles = get_articles(limit=500)
 
-data = []
-for a in articles:
-    data.append({
-        "Title": a.title,
-        "Description": a.description,
-        "Source": a.source,
-        "Published At": a.published_at,
-        "Sentiment": a.sentiment,
-        "Topic": a.topic
-    })
+# If DB empty → auto fetch
+if not articles:
+    st.warning("No articles found. Fetching latest news...")
+    try:
+        import fetch_articles
+        fetch_articles.main()
+        articles = get_articles(limit=500)
+    except Exception as e:
+        st.error(f"Error while fetching articles: {e}")
+        st.stop()
+
+# Still empty?
+if not articles:
+    st.error("No articles available.")
+    st.stop()
+
+# -----------------------------------
+# Convert to DataFrame
+# -----------------------------------
+data = [{
+    "Title": a.title,
+    "Description": a.description,
+    "Source": a.source,
+    "Published At": a.published_at,
+    "Sentiment": a.sentiment,
+    "Topic": a.topic
+} for a in articles]
 
 df = pd.DataFrame(data)
 
-# ✅ SAFETY CHECK
 if df.empty:
-    st.warning("No articles found in database.")
+    st.error("Database returned empty dataset.")
     st.stop()
 
+# Safe datetime conversion
 if "Published At" in df.columns:
     df["Published At"] = pd.to_datetime(df["Published At"], errors="coerce")
 
-# Sidebar filter
-topics = ["All"] + sorted(df["Topic"].dropna().unique().tolist())
+# -----------------------------------
+# Sidebar Topic Filter
+# -----------------------------------
+if "Topic" in df.columns:
+    topics = ["All"] + sorted(df["Topic"].dropna().unique().tolist())
+else:
+    topics = ["All"]
+
 selected_topic = st.sidebar.selectbox("Select Topic", topics)
 
-if selected_topic != "All":
+if selected_topic != "All" and "Topic" in df.columns:
     df = df[df["Topic"] == selected_topic]
 
+# -----------------------------------
 # Search
+# -----------------------------------
 search_query = st.text_input("Search Articles by Title")
-if search_query:
+
+if search_query and "Title" in df.columns:
     df = df[df["Title"].str.contains(search_query, case=False, na=False)]
 
 st.write(f"Showing {len(df)} articles")
 st.dataframe(df)
 
-# Pie chart
-sentiment_counts = df["Sentiment"].value_counts()
-fig1, ax1 = plt.subplots()
-ax1.pie(sentiment_counts, labels=sentiment_counts.index, autopct="%1.1f%%")
-ax1.axis("equal")
-st.pyplot(fig1)
+# -----------------------------------
+# Sentiment Pie Chart
+# -----------------------------------
+if "Sentiment" in df.columns and not df.empty:
+    sentiment_counts = df["Sentiment"].value_counts()
 
-# Bar chart
-topic_sentiment = df.groupby(["Topic", "Sentiment"]).size().unstack(fill_value=0)
-st.bar_chart(topic_sentiment)
+    if not sentiment_counts.empty:
+        fig1, ax1 = plt.subplots()
+        ax1.pie(
+            sentiment_counts,
+            labels=sentiment_counts.index,
+            autopct='%1.1f%%',
+            startangle=90
+        )
+        ax1.axis("equal")
+        st.pyplot(fig1)
+
+# -----------------------------------
+# Topic Sentiment Bar Chart
+# -----------------------------------
+if not df.empty and "Topic" in df.columns and "Sentiment" in df.columns:
+    topic_sentiment = df.groupby(["Topic", "Sentiment"]).size().unstack(fill_value=0)
+    st.bar_chart(topic_sentiment)
