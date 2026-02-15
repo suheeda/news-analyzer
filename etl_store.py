@@ -4,17 +4,21 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime, Text, F
 from sqlalchemy.orm import declarative_base, sessionmaker
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
-# --- Database setup ---
+# ---------------- DATABASE SETUP ---------------- #
+
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///news.db")
+
 Base = declarative_base()
 engine = create_engine(DATABASE_URL, echo=False)
 Session = sessionmaker(bind=engine)
 session = Session()
 
-# --- Sentiment analyzer ---
+# ---------------- SENTIMENT ANALYZER ---------------- #
+
 analyzer = SentimentIntensityAnalyzer()
 
-# --- Article model ---
+# ---------------- ARTICLE MODEL ---------------- #
+
 class Article(Base):
     __tablename__ = "articles"
 
@@ -26,49 +30,71 @@ class Article(Base):
     url = Column(String, unique=True)
     published_at = Column(DateTime)
     content = Column(Text)
-    sentiment = Column(String, default="unknown")
+    sentiment = Column(String, default="neutral")
     sentiment_compound = Column(Float, default=0.0)
-    topic = Column(String, default="general")  # Ensure default topic
+    topic = Column(String, default="general")
 
-# --- Create tables if they don't exist ---
+# Create tables if not exist
 Base.metadata.create_all(engine)
 
-# --- Helper function: compute sentiment ---
+# ---------------- SENTIMENT FUNCTION ---------------- #
+
 def compute_sentiment(text):
     if not text:
-        return "unknown", 0.0
-    scores = analyzer.polarity_scores(text)
-    compound = scores['compound']
-    if compound >= 0.05:
-        return "positive", compound
-    elif compound <= -0.05:
-        return "negative", compound
-    else:
-        return "neutral", compound
+        return "neutral", 0.0
 
-# --- Save articles ---
+    scores = analyzer.polarity_scores(text)
+    compound = scores.get("compound", 0.0)
+
+    if compound >= 0.05:
+        return "Positive", compound
+    elif compound <= -0.05:
+        return "Negative", compound
+    else:
+        return "Neutral", compound
+
+# ---------------- SAVE ARTICLES ---------------- #
+
 def save_articles(articles_list):
     for art in articles_list:
-        # Check if article already exists
+
+        # Skip if URL missing
+        if not art.get("url"):
+            continue
+
+        # Check duplicate
         existing = session.query(Article).filter_by(url=art.get("url")).first()
         if existing:
             continue
 
-        # Compute sentiment
-        sentiment, compound = compute_sentiment(art.get("content") or art.get("description"))
+        # Handle NewsAPI source (can be dict)
+        source_data = art.get("source")
+        if isinstance(source_data, dict):
+            source_name = source_data.get("name")
+        else:
+            source_name = source_data
 
-        # Ensure topic exists
+        # Compute sentiment
+        text_for_sentiment = art.get("content") or art.get("description") or ""
+        sentiment, compound = compute_sentiment(text_for_sentiment)
+
+        # Handle topic safely
         topic = art.get("topic") or "general"
 
-        published_at = art.get("publishedAt")
-        if published_at:
+        # Handle published date safely
+        published_at = None
+        published_raw = art.get("publishedAt")
+
+        if published_raw:
             try:
-                published_at = datetime.fromisoformat(published_at.replace("Z", "+00:00"))
+                published_at = datetime.fromisoformat(
+                    published_raw.replace("Z", "+00:00")
+                )
             except Exception:
                 published_at = None
 
         article_obj = Article(
-            source=art.get("source"),
+            source=source_name,
             author=art.get("author"),
             title=art.get("title"),
             description=art.get("description"),
@@ -79,13 +105,19 @@ def save_articles(articles_list):
             sentiment_compound=compound,
             topic=topic
         )
+
         session.add(article_obj)
 
     session.commit()
 
-# --- Fetch articles ---
+# ---------------- FETCH ARTICLES ---------------- #
+
 def get_articles(limit=None):
-    query = session.query(Article).order_by(Article.published_at.desc())
+    query = session.query(Article).order_by(
+        Article.published_at.desc().nullslast()
+    )
+
     if limit:
         query = query.limit(limit)
+
     return query.all()

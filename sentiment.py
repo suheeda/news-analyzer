@@ -1,37 +1,64 @@
-import nltk
-from nltk.sentiment.vader import SentimentIntensityAnalyzer
-from sqlalchemy.orm import sessionmaker
-from etl_store import engine, Article, init_db
+import os
+from newsapi import NewsApiClient
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from dotenv import load_dotenv
 
-# Make sure NLTK VADER is available
-nltk.download("vader_lexicon")
+# Load environment variables
+load_dotenv()
 
-Session = sessionmaker(bind=engine, future=True)
+NEWS_API_KEY = os.getenv("")
 
-def compute_sentiment():
-    """Compute sentiment for all articles and store results in DB."""
-    init_db()
-    session = Session()
+analyzer = SentimentIntensityAnalyzer("7a96a14ea46d46e481849d3024d03d7f")
 
-    sia = SentimentIntensityAnalyzer()
-    articles = session.query(Article).all()
+def get_news_articles(query="technology", page_size=100):
+    """
+    Fetch news articles from NewsAPI and return structured list
+    """
+    if not NEWS_API_KEY:
+        raise ValueError("NEWS_API_KEY not found in environment variables")
 
-    updated = 0
-    for art in articles:
-        text = " ".join(
-            [str(x) for x in [art.title, art.description, art.content] if x]
+    newsapi = NewsApiClient(api_key=NEWS_API_KEY)
+
+    try:
+        response = newsapi.get_everything(
+            q=query,
+            language="en",
+            sort_by="publishedAt",
+            page_size=page_size
         )
-        if not text.strip():
-            continue
+    except Exception as e:
+        print("NewsAPI Error:", e)
+        return []
 
-        # Compute sentiment
-        scores = sia.polarity_scores(text)
-        art.sentiment_compound = scores["compound"]
-        updated += 1
+    articles = response.get("articles", [])
 
-    session.commit()
-    session.close()
-    print(f"✅ Sentiment updated for {updated} articles.")
+    processed_articles = []
 
-if __name__ == "__main__":
-    compute_sentiment()
+    for article in articles:
+        title = article.get("title") or ""
+        description = article.get("description") or ""
+        source = article.get("source", {}).get("name", "Unknown")
+        published_at = article.get("publishedAt")
+
+        text = f"{title} {description}"
+
+        # Sentiment analysis
+        sentiment_score = analyzer.polarity_scores(text)["compound"]
+
+        if sentiment_score >= 0.05:
+            sentiment = "Positive"
+        elif sentiment_score <= -0.05:
+            sentiment = "Negative"
+        else:
+            sentiment = "Neutral"
+
+        processed_articles.append({
+            "title": title,
+            "description": description,
+            "source": source,
+            "published_at": published_at,
+            "sentiment": sentiment,
+            "topic": query
+        })
+
+    return processed_articles
