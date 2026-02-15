@@ -2,13 +2,11 @@ import os
 from newsapi import NewsApiClient
 from etl_store import save_articles
 
-# ✅ Put your API key here OR use Railway environment variable
-DEFAULT_API_KEY = "7a96a14ea46d46e481849d3024d03d7f"
-
-API_KEY = os.getenv("NEWSAPI_KEY") or DEFAULT_API_KEY
+# Read API key from Railway env variable first
+API_KEY = os.getenv("7a96a14ea46d46e481849d3024d03d7f")
 
 if not API_KEY:
-    raise ValueError("No NewsAPI key provided. Set NEWSAPI_KEY or DEFAULT_API_KEY.")
+    raise ValueError("NEWSAPI_KEY not found in environment variables.")
 
 newsapi = NewsApiClient(api_key=API_KEY)
 
@@ -19,11 +17,15 @@ def fetch_live_articles():
     all_articles = []
 
     for topic in TOPICS:
-        response = newsapi.get_top_headlines(
-            category=topic,
-            language="en",
-            page_size=20
-        )
+        try:
+            response = newsapi.get_top_headlines(
+                category=topic,
+                language="en",
+                page_size=20
+            )
+        except Exception as e:
+            print(f"Error fetching {topic}: {e}")
+            continue
 
         for article in response.get("articles", []):
             if not article.get("url"):
@@ -43,13 +45,14 @@ def fetch_live_articles():
     return all_articles
 
 
-# ✅ Add this function (IMPORTANT)
 def main():
     articles = fetch_live_articles()
-    save_articles(articles)
-    print(f"Saved {len(articles)} live articles to the database.")
+    if articles:
+        save_articles(articles)
+        print(f"Saved {len(articles)} live articles to the database.")
+    else:
+        print("No articles fetched.")
 
 
-# For manual run
 if __name__ == "__main__":
     main()
