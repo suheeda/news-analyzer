@@ -22,6 +22,9 @@ if not articles:
         if new_articles:
             save_articles(new_articles)
             articles = get_articles(limit=500)
+        else:
+            st.error("No articles fetched from NewsAPI.")
+            st.stop()
     except Exception as e:
         st.error(f"Error while fetching articles: {e}")
         st.stop()
@@ -49,15 +52,21 @@ if df.empty:
     st.error("Database returned empty dataset.")
     st.stop()
 
-df["Published At"] = pd.to_datetime(df["Published At"], errors="coerce")
+# Safe datetime conversion
+if "Published At" in df.columns:
+    df["Published At"] = pd.to_datetime(df["Published At"], errors="coerce")
 
 # -----------------------------------
 # Sidebar Filter
 # -----------------------------------
-topics = ["All"] + sorted(df["Topic"].dropna().unique().tolist())
+if "Topic" in df.columns:
+    topics = ["All"] + sorted(df["Topic"].dropna().unique().tolist())
+else:
+    topics = ["All"]
+
 selected_topic = st.sidebar.selectbox("Select Topic", topics)
 
-if selected_topic != "All":
+if selected_topic != "All" and "Topic" in df.columns:
     df = df[df["Topic"] == selected_topic]
 
 # -----------------------------------
@@ -65,7 +74,7 @@ if selected_topic != "All":
 # -----------------------------------
 search_query = st.text_input("Search Articles by Title")
 
-if search_query:
+if search_query and "Title" in df.columns:
     df = df[df["Title"].str.contains(search_query, case=False, na=False)]
 
 st.write(f"Showing {len(df)} articles")
@@ -74,21 +83,23 @@ st.dataframe(df)
 # -----------------------------------
 # Sentiment Pie Chart
 # -----------------------------------
-sentiment_counts = df["Sentiment"].value_counts()
+if not df.empty and "Sentiment" in df.columns:
+    sentiment_counts = df["Sentiment"].value_counts()
 
-if not sentiment_counts.empty:
-    fig1, ax1 = plt.subplots()
-    ax1.pie(
-        sentiment_counts,
-        labels=sentiment_counts.index,
-        autopct='%1.1f%%',
-        startangle=90
-    )
-    ax1.axis("equal")
-    st.pyplot(fig1)
+    if not sentiment_counts.empty:
+        fig1, ax1 = plt.subplots()
+        ax1.pie(
+            sentiment_counts,
+            labels=sentiment_counts.index,
+            autopct='%1.1f%%',
+            startangle=90
+        )
+        ax1.axis("equal")
+        st.pyplot(fig1)
 
 # -----------------------------------
 # Topic Sentiment Bar Chart
 # -----------------------------------
-topic_sentiment = df.groupby(["Topic", "Sentiment"]).size().unstack(fill_value=0)
-st.bar_chart(topic_sentiment)
+if not df.empty and "Topic" in df.columns and "Sentiment" in df.columns:
+    topic_sentiment = df.groupby(["Topic", "Sentiment"]).size().unstack(fill_value=0)
+    st.bar_chart(topic_sentiment)
