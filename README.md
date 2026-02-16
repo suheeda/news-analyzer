@@ -29,9 +29,7 @@ Sentiment Analysis
 
 Visualizes sentiment trends: positive, neutral, and negative news over time.
 
-
-
-Tip: Replace PASTE_YOUR_RAW_URL_HERE with the raw image URL from your GitHub assets folder. Don’t forget ?raw=true at the end.
+(https://github.com/suheeda/news-analyzer/commit/d05a8a6f87d5a6939751eb9ea0b525e5d189f434)
 
 🛠️ Tech Stack
 
