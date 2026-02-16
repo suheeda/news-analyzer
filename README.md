@@ -4,7 +4,9 @@ Tech Stack: Python 🐍, Streamlit 🌐, NewsAPI 🗞️, NLTK 🧠, TextBlob �
 
 🚀 Project Overview
 
-The News Analyzer Dashboard is an interactive web app that fetches real-time news and performs sentiment analysis to provide actionable insights. Users can explore trending news topics, analyze sentiment, and visualize data interactively. This project highlights Natural Language Processing (NLP) and data visualization skills.
+The News Analyzer Dashboard is an interactive web app that fetches real-time news and performs sentiment analysis to provide actionable insights. Users can explore trending news topics, analyze sentiment, and visualize data interactively.
+
+This project highlights Natural Language Processing (NLP), data visualization, and working with APIs.
 
 🌟 Features
 
@@ -15,6 +17,21 @@ Sentiment Analysis 😊😐😡 – Classifies news as positive, neutral, or neg
 Data Processing & Insights 📊 – Cleans and structures news data for meaningful analysis.
 
 Interactive Dashboard 🌐 – Built with Streamlit and Plotly for dynamic, interactive visualization.
+
+🖥️ Dashboard Preview
+Home Page
+
+
+Interactive dashboard showing the latest real-time news fetched via NewsAPI.
+
+Sentiment Analysis
+
+
+Visualizes sentiment trends: positive, neutral, and negative news over time.
+
+
+
+Tip: Replace PASTE_YOUR_RAW_URL_HERE with the raw image URL from your GitHub assets folder. Don’t forget ?raw=true at the end.
 
 🛠️ Tech Stack
 
@@ -34,7 +51,7 @@ Plotly – Data visualization 📈
 
 Clone the repository:
 
-git clone <your-repo-link>
+git clone https://github.com/suheeda/news-analyzer.git
 
 Install dependencies:
 
@@ -45,7 +62,6 @@ Run the Streamlit app:
 streamlit run app.py
 
 Explore real-time news trends and sentiment analysis in the interactive dashboard 🌟
-
 
 💡 Skills Highlighted
 
